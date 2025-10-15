@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Handcrafted Marketplace</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css"
+    />
+    <style>
+      body {
+        margin: 2rem auto;
+        max-width: 960px;
+      }
+
+      header {
+        margin-bottom: 2rem;
+      }
+
+      section {
+        margin-bottom: 3rem;
+      }
+
+      .card {
+        border: 1px solid #dcdcdc;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+      }
+
+      .listings-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 1rem;
+      }
+
+      .listing h4 {
+        margin-bottom: 0.5rem;
+      }
+
+      .muted {
+        color: #757575;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Handcrafted Marketplace</h1>
+      <p class="muted">
+        Minimal proof-of-concept marketplace inspired by Etsy. Create users, add
+        listings, and place orders between buyers and sellers.
+      </p>
+    </header>
+
+    <section>
+      <h2>Create an account</h2>
+      <form id="user-form">
+        <label for="user-name">Name</label>
+        <input id="user-name" name="name" type="text" required />
+
+        <label for="user-email">Email</label>
+        <input id="user-email" name="email" type="email" required />
+
+        <label for="user-role">Role</label>
+        <select id="user-role" name="role">
+          <option value="buyer">Buyer</option>
+          <option value="seller">Seller</option>
+          <option value="both" selected>Both</option>
+        </select>
+
+        <button type="submit">Create user</button>
+      </form>
+      <p id="user-result" class="muted"></p>
+    </section>
+
+    <section>
+      <h2>Publish a listing</h2>
+      <form id="listing-form">
+        <label for="listing-title">Title</label>
+        <input id="listing-title" name="title" type="text" required />
+
+        <label for="listing-description">Description</label>
+        <textarea id="listing-description" name="description" required></textarea>
+
+        <label for="listing-price">Price</label>
+        <input
+          id="listing-price"
+          name="price"
+          type="number"
+          step="0.01"
+          min="0"
+          required
+        />
+
+        <label for="listing-quantity">Quantity</label>
+        <input
+          id="listing-quantity"
+          name="quantity"
+          type="number"
+          min="1"
+          step="1"
+          required
+        />
+
+        <label for="listing-seller">Seller ID</label>
+        <input
+          id="listing-seller"
+          name="seller_id"
+          type="number"
+          min="1"
+          required
+        />
+
+        <button type="submit">Create listing</button>
+      </form>
+      <p id="listing-result" class="muted"></p>
+    </section>
+
+    <section>
+      <h2>Place an order</h2>
+      <form id="order-form">
+        <label for="order-buyer">Buyer ID</label>
+        <input id="order-buyer" name="buyer_id" type="number" min="1" required />
+
+        <label for="order-product">Listing ID</label>
+        <input
+          id="order-product"
+          name="product_id"
+          type="number"
+          min="1"
+          required
+        />
+
+        <label for="order-quantity">Quantity</label>
+        <input
+          id="order-quantity"
+          name="quantity"
+          type="number"
+          min="1"
+          step="1"
+          required
+        />
+
+        <button type="submit">Place order</button>
+      </form>
+      <p id="order-result" class="muted"></p>
+    </section>
+
+    <section>
+      <h2>Marketplace listings</h2>
+      <form id="search-form" style="display: flex; gap: 0.5rem; align-items: flex-end">
+        <div style="flex: 1">
+          <label for="search-query">Search</label>
+          <input id="search-query" name="search" type="text" placeholder="e.g. candles" />
+        </div>
+        <div>
+          <label for="search-seller">Seller ID</label>
+          <input id="search-seller" name="seller_id" type="number" min="1" />
+        </div>
+        <button type="submit">Filter</button>
+        <button id="reset-search" type="button" class="button-outline">Reset</button>
+      </form>
+
+      <div id="listings" class="listings-grid"></div>
+    </section>
+
+    <script>
+      const API_BASE = "";
+
+      const userForm = document.getElementById("user-form");
+      const listingForm = document.getElementById("listing-form");
+      const orderForm = document.getElementById("order-form");
+      const searchForm = document.getElementById("search-form");
+      const resetSearch = document.getElementById("reset-search");
+
+      const userResult = document.getElementById("user-result");
+      const listingResult = document.getElementById("listing-result");
+      const orderResult = document.getElementById("order-result");
+      const listingsContainer = document.getElementById("listings");
+
+      async function createResource(endpoint, data) {
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+        const body = await response.json();
+        if (!response.ok) {
+          throw new Error(body.detail || "Request failed");
+        }
+        return body;
+      }
+
+      function renderListings(listings) {
+        listingsContainer.innerHTML = "";
+        if (!listings.length) {
+          listingsContainer.innerHTML = "<p class='muted'>No listings yet.</p>";
+          return;
+        }
+
+        listings.forEach((listing) => {
+          const card = document.createElement("div");
+          card.className = "card listing";
+          card.innerHTML = `
+            <h4>${listing.title}</h4>
+            <p>${listing.description}</p>
+            <p><strong>$${listing.price.toFixed(2)}</strong> · ${listing.quantity} available</p>
+            <p class="muted">Listing #${listing.id} by seller ${listing.seller_id}</p>
+          `;
+          listingsContainer.appendChild(card);
+        });
+      }
+
+      async function refreshListings(params = {}) {
+        const query = new URLSearchParams();
+        if (params.search) query.set("search", params.search);
+        if (params.seller_id) query.set("seller_id", params.seller_id);
+        const url = `${API_BASE}/listings${query.toString() ? `?${query}` : ""}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        renderListings(data);
+      }
+
+      userForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const formData = Object.fromEntries(new FormData(userForm));
+        try {
+          const result = await createResource("/users", formData);
+          userResult.textContent = `Created user #${result.id}`;
+          userForm.reset();
+        } catch (error) {
+          userResult.textContent = error.message;
+        }
+      });
+
+      listingForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const formData = Object.fromEntries(new FormData(listingForm));
+        formData.price = parseFloat(formData.price);
+        formData.quantity = parseInt(formData.quantity, 10);
+        formData.seller_id = parseInt(formData.seller_id, 10);
+
+        try {
+          const result = await createResource("/listings", formData);
+          listingResult.textContent = `Listing #${result.id} published`;
+          listingForm.reset();
+          refreshListings();
+        } catch (error) {
+          listingResult.textContent = error.message;
+        }
+      });
+
+      orderForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const formData = Object.fromEntries(new FormData(orderForm));
+        formData.quantity = parseInt(formData.quantity, 10);
+        formData.buyer_id = parseInt(formData.buyer_id, 10);
+        formData.product_id = parseInt(formData.product_id, 10);
+
+        try {
+          const result = await createResource("/orders", formData);
+          orderResult.textContent = `Order #${result.id} confirmed for $${result.total_price.toFixed(2)}`;
+          orderForm.reset();
+          refreshListings();
+        } catch (error) {
+          orderResult.textContent = error.message;
+        }
+      });
+
+      searchForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const formData = Object.fromEntries(new FormData(searchForm));
+        await refreshListings(formData);
+      });
+
+      resetSearch.addEventListener("click", () => {
+        searchForm.reset();
+        refreshListings();
+      });
+
+      refreshListings();
+    </script>
+  </body>
+</html>
